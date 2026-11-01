@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <RootNamespace>MelonAdapter.Runtime</RootNamespace>
+    <AssemblyName>MelonAdapter.Runtime</AssemblyName>
+    <AssemblyVersion>1.2.2.0</AssemblyVersion>
+    <FileVersion>1.2.2.0</FileVersion>
+    <Description>MelonAdapter runtime: discovery, isolation, lifecycle dispatch and preferences for MelonLoader mods hosted by UnityModManager.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MelonLoader.Facade\MelonLoader.Facade.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The same document ships next to Config.toml; the embedded copy keeps the UI usable without it. -->
+    <EmbeddedResource Include="Localization\lang.json" LogicalName="MelonAdapter.Runtime.Language.lang.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(LibsDir)0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>SampleMod</AssemblyName>
+    <RootNamespace>SampleMod</RootNamespace>
+    <Description>Basic MelonLoader mod exercising the MelonAdapter lifecycle, preferences, events, coroutines and Harmony support.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MelonLoader.dll is supplied by MelonAdapter at runtime, so it must not be copied next to the mod. -->
+    <ProjectReference Include="..\..\src\MelonLoader.Facade\MelonLoader.Facade.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\SupportLib\SupportLib.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(LibsDir)0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

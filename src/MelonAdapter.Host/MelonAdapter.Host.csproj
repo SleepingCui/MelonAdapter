@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>MelonAdapter</AssemblyName>
+    <RootNamespace>MelonAdapter.Host</RootNamespace>
+    <Description>UnityModManager host for MelonAdapter: loads Mono MelonLoader mods inside a UMM game.</Description>
+    <AssemblyVersion>1.2.2.0</AssemblyVersion>
+    <FileVersion>1.2.2.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Only the runtime project is referenced here. MelonLoader.Facade flows in transitively through it;
+      referencing it directly as well creates a diamond that makes parallel MSBuild builds of the
+      .NET 10 SDK fail without reporting an error.
+    -->
+    <ProjectReference Include="..\MelonAdapter.Runtime\MelonAdapter.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Unity and UMM are provided by the game process; never copy them next to the adapter. -->
+    <Reference Include="UnityEngine">
+      <HintPath>$(LibsDir)UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(LibsDir)UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- IMGUI (GUILayout/GUIStyle) lives in its own Unity module assembly. -->
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(LibsDir)UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- FontStyle (used for bold labels) is defined in the text rendering module. -->
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(LibsDir)UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityModManager">
+      <HintPath>$(LibsDir)UnityModManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

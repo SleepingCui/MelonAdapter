@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>SupportLib</AssemblyName>
+    <RootNamespace>SupportLib</RootNamespace>
+    <Description>Private helper assembly shipped next to a mod, used to validate MelonAdapter's assembly resolution scope.</Description>
+  </PropertyGroup>
+
+</Project>

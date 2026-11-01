@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MelonLoader.Facade/MelonLoader.Facade.csproj" />
+    <Project Path="src/MelonAdapter.Runtime/MelonAdapter.Runtime.csproj" />
+    <Project Path="src/MelonAdapter.Host/MelonAdapter.Host.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/SampleMod/SampleMod.csproj" />
+    <Project Path="samples/SampleMod.MissingDependency/SampleMod.MissingDependency.csproj" />
+    <Project Path="samples/SampleMod.Throwing/SampleMod.Throwing.csproj" />
+    <Project Path="samples/SupportLib/SupportLib.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MelonAdapter.SelfTest/MelonAdapter.SelfTest.csproj" />
+  </Folder>
+</Solution>

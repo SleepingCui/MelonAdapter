@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>SampleMod.Throwing</AssemblyName>
+    <RootNamespace>SampleMod.Throwing</RootNamespace>
+    <Description>Negative test mod: throws on every update so MelonAdapter must disable it after repeated failures.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MelonLoader.Facade\MelonLoader.Facade.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

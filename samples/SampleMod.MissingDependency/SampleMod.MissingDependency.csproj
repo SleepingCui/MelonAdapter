@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>SampleMod.MissingDependency</AssemblyName>
+    <RootNamespace>SampleMod.MissingDependency</RootNamespace>
+    <Description>Negative test mod: declares a required dependency that is never installed.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MelonLoader.Facade\MelonLoader.Facade.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

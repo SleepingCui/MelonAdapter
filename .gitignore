@@ -1,0 +1,14 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+dist/
+.scratch/
+
+# IDE state is per developer and is never part of the source history.
+.idea/
+.vs/
+
+# Build-time references (Unity, UMM, Harmony) are supplied locally and are not part of the repo.
+libs/

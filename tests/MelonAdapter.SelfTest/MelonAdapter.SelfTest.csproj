@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>MelonAdapter.SelfTest</AssemblyName>
+    <RootNamespace>MelonAdapter.SelfTest</RootNamespace>
+    <Description>Headless validation matrix for the MelonAdapter runtime (phase 8 of the specification).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The runtime links against 0Harmony with Private=false; the shipped layout keeps it next to the
+         adapter assemblies, so the self test mirrors that by placing it in its own output directory. -->
+    <None Include="$(LibsDir)0Harmony.dll" Link="0Harmony.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MelonAdapter.Runtime\MelonAdapter.Runtime.csproj" />
+    <!-- Built before the self test so the sample assemblies are available, but never referenced. -->
+    <ProjectReference Include="..\..\samples\SampleMod\SampleMod.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\samples\SampleMod.MissingDependency\SampleMod.MissingDependency.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\samples\SampleMod.Throwing\SampleMod.Throwing.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\samples\SupportLib\SupportLib.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <Target Name="CopySelftestMods" AfterTargets="Build">
+    <ItemGroup>
+      <SelftestMod Include="..\..\samples\SampleMod\bin\$(Configuration)\net472\SampleMod.dll" />
+      <SelftestMod Include="..\..\samples\SampleMod.MissingDependency\bin\$(Configuration)\net472\SampleMod.MissingDependency.dll" />
+      <SelftestMod Include="..\..\samples\SampleMod.Throwing\bin\$(Configuration)\net472\SampleMod.Throwing.dll" />
+      <SelftestMod Include="..\..\samples\SupportLib\bin\$(Configuration)\net472\SupportLib.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SelftestMod)" DestinationFolder="$(OutDir)TestMods" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

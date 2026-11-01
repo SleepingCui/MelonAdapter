@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+    <LibsDir>$(MSBuildThisFileDirectory)libs\</LibsDir>
+    <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+    <NoWarn>$(NoWarn);CS1591;CS0618;MSB3274;MSB3270</NoWarn>
+    <!-- 0Harmony ships built against .NET Framework 4.8 while Unity's Mono runtime is 4.7.2 compatible. -->
+    <ResolveAssemblyReferenceIgnoreTargetFrameworkAttributeVersionMismatch>true</ResolveAssemblyReferenceIgnoreTargetFrameworkAttributeVersionMismatch>
+    <Company>MelonAdapter</Company>
+    <Product>MelonAdapter</Product>
+  </PropertyGroup>
+</Project>
