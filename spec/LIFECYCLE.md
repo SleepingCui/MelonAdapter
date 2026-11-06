@@ -1,6 +1,6 @@
 # 生命周期与事件调度
 
-本文档定义 MelonAdapter 1.2.2 的回调顺序契约。顺序是**稳定的、与文件系统枚举顺序无关的**，并且每个 melon 的每次回调都被单独隔离。
+本文档定义 MelonAdapter 1.2.2 的回调顺序和异常处理规则。
 
 ## 1. 调度器
 
@@ -16,43 +16,35 @@
 | `SceneManager.sceneUnloaded` | `OnSceneWasUnloaded(buildIndex, name)` |
 | `OnDestroy` | 退订场景回调（不触发 mod 回调） |
 
-所有 mod 回调都在 Unity 主线程执行；运行时不创建线程、不排队到线程池。`AdapterTicker` 的每次转发都包了 `try/catch`，Unity 侧异常不会打断游戏主循环。
+所有模组回调均在 Unity 主线程执行。Host 转发时捕获异常，避免打断游戏主循环。
 
 ## 2. 启动：`AdapterRuntime.Initialize()`
 
 由 Host 在 UMM 的 `Load(ModEntry)` 内调用，严格按下列顺序执行：
 
-| # | 步骤 | 可见日志（节选） |
-|---|---|---|
-| 1 | 创建目录（`Config.toml` 所在目录、`Logs/`、`Mods/`、`UserData/`） | `[config]` / `[paths]` |
-| 2 | 读取配置；缺失则写默认、损坏则改名保留并重建 | `[config] Created ...` / `[config] Corrupt ...` |
-| 3 | 打开适配器日志 | — |
-| 4 | 偏好设置迁移（可选，见 `docs/CONFIGURATION.md`） | `[preferences] Imported MelonLoader preferences ...` |
-| 5 | 接线 `AdapterBridge`（日志/上下文/偏好/协程/Harmony/注册表） | — |
-| 6 | 打印启动横幅 | `[banner] Game: ...` / `Unity: ...` / `Host: UnityModManager ...` / `MelonLoader API baseline: 0.7.3.0` / `Harmony: ...` |
-| 7 | 若 `enabled = false`：记录说明、生成兼容报告并**直接返回**（不扫描、不加载） | `[runtime] The adapter is disabled ...` |
-| 8 | 安装 `AssemblyResolve` 处理器（程序集解析器） | `[resolver] ...` |
-| 9 | 扫描 `Mods/`：读取程序集身份、Melon 元数据、私有依赖 | `[scan] ...` |
-| 10 | 依赖图排序；缺依赖 / 循环依赖 / 重复 id 标记为拒绝 | `[graph] Rejected 「<name>」: ...` |
-| 11 | 逐个实例化并注册 melon，建立程序集与记录的映射，创建每模组 `UserData/<id>/` | `[mods] Loaded 「<name>」 ...` |
-| 12 | 事件 `OnPreInitialization` | — |
-| 13 | 事件 `OnPreSupportModule` | — |
-| 14 | 回调 `OnEarlyInitializeMelon` → `OnInitializeMelon` → `OnLateInitializeMelon` | — |
-| 15 | 事件 `OnPreModsLoaded` | — |
-| 16 | 写兼容报告，输出 `Initialization complete: <状态摘要>` | `[runtime] Initialization complete: 2/3 mods active, ...` |
+| # | 步骤 |
+|---|---|
+| 1 | 创建目录、读取配置（缺失则生成，损坏则备份重建）、打开日志。 |
+| 2 | 迁移偏好（如启用）、接线 `AdapterBridge`、打印启动横幅。 |
+| 3 | 若 `enabled = false`，写兼容报告并返回，不扫描或加载模组。 |
+| 4 | 安装 `AssemblyResolve`，扫描 `Mods/` 并读取程序集、元数据和私有依赖。 |
+| 5 | 建立依赖顺序；拒绝缺失依赖、循环依赖和重复 id。 |
+| 6 | 实例化并注册模组，建立记录映射并创建各自的 `UserData/<id>/`。 |
+| 7 | 依次派发 `OnPreInitialization`、`OnPreSupportModule`、`OnEarlyInitializeMelon`、`OnInitializeMelon`、`OnLateInitializeMelon` 和 `OnPreModsLoaded`。 |
+| 8 | 写兼容报告并记录初始化状态摘要。 |
 
-注意：`OnApplicationStart` 系列**不在启动时**触发，而是延迟到第一帧（见第 3 节），这与 MelonLoader 的时序一致——模组初始化时 Unity 场景尚未就绪。
+`OnApplicationStart` 系列不在模组初始化阶段触发，而是在首帧派发（见第 3 节）。
 
 ## 3. 首帧：延迟的应用启动回调
 
-`Tick` 第一次被调用时（即第一帧）执行一次：
+首次调用 `Tick` 时依次执行：
 
 1. `MelonEvents.OnApplicationEarlyStart` → 各 melon `OnApplicationEarlyStart()`
 2. `MelonEvents.OnApplicationStart` → 各 melon `OnApplicationStart()`
 3. `MelonEvents.OnApplicationLateStart` → 各 melon `OnApplicationLateStart()`
 4. 各 melon `OnModSettingsApplied()`（基类没有对应通知事件）
 
-随后 `AdapterTicker` 在第一帧报告一次活动场景（`IsValid()` 为真时），走第 5 节的场景序列。
+随后，若活动场景有效，`AdapterTicker` 按第 5 节派发场景回调。
 
 ## 4. 每帧顺序
 
@@ -63,7 +55,7 @@ LateUpdate:  MelonEvents.OnLateUpdate → 各 melon OnLateUpdate()
 OnGUI:       MelonEvents.OnGUI → 各 melon OnGUI()
 ```
 
-统一规则：**同一回调的事件订阅者先执行，然后才是各 melon 的覆写方法**；每一层内部按第 6 节的稳定顺序派发。协程只在 `Tick` 中推进一次，`FixedUpdate` / `LateUpdate` 不推进协程。
+事件订阅者先于模组覆写方法执行，两者均按第 6 节排序。协程只在 `Tick` 中推进。
 
 ## 5. 场景回调
 
@@ -88,60 +80,53 @@ Unity 5.x 之前没有 sceneUnloaded；Host 订阅失败时只记录 `[unity] Sc
 
 ## 6. 派发顺序（确定性规则）
 
-加载顺序与派发顺序同源，由依赖图产生，排序键依次为：
+依赖图决定加载和派发顺序，排序键依次为：
 
 1. `MelonPriorityAttribute` 的优先级（降序，默认 0）；
 2. 显示名（`OrdinalIgnoreCase`）；
 3. 依赖深度（升序）；
 4. 程序集路径（`OrdinalIgnoreCase`）。
 
-以满足依赖约束（被依赖者先加载）为前提。同一批模组在不同启动、不同目录枚举顺序下得到相同顺序；重复 id 时先到者胜出，后到者以 `Duplicate mod id ...` 被拒绝。
+排序同时满足依赖约束（依赖项先加载）。重复 id 时保留排序靠前者并拒绝其余项。
 
 ## 7. 异常隔离与自动禁用
 
-- 每次回调都包在 `try/catch` 中；异常不会传播给 Unity 或其它模组。
-- 每个「模组 + 回调名」维护**连续**异常计数；成功执行一次即清零。
-- 计数达到 `[lifecycle] maxConsecutiveExceptions`（默认 5）时，该模组被禁用：
+- 回调异常不会传播给 Unity 或其它模组。
+- 每个模组和回调分别计数；成功执行后清零。达到 `[lifecycle] maxConsecutiveExceptions`（默认 5）时禁用模组：
 
   ```text
   [callbacks] <name> threw in <callback> (<melon type>, 5/5): <exception>
   [lifecycle] <name> Disabled after 5 consecutive callback exceptions (last in OnUpdate).
   ```
 
-- 禁用动作 = 标记 `Disabled`、记录失败原因、退订该程序集的所有 `MelonEvents` 订阅、撤销该 owner 的 Harmony patch、调用 `Unregister(reason, important: true)`、重写兼容报告。
-- `mods` 表中状态不是 `Loaded` 的模组（`Rejected` / `Disabled` / `Failed`）不再收到任何回调。
+- 禁用时标记状态和原因、退订事件、撤销 Harmony patch、调用 `Unregister` 并重写兼容报告。
+- 状态不为 `Loaded` 的模组不再收到回调。
 
 ### 7.1 手动禁用单个模组
 
-运行期手动禁用与自动禁用共用同一套清理动作（`AdapterRuntime.DisableRecord`）：
+手动禁用与自动禁用执行相同清理：
 
-- API：`AdapterRuntime.DisableMod(string modId, string reason)`。`modId` 接受 mod id（`MelonInfo` 名字）、显示名或程序集简单名，不区分大小写；只有状态为 `Loaded` 的模组会被禁用，返回 `true`，否则 `false`。
-- 清理顺序：把记录置为 `Disabled` 并写明原因 → 退订该程序集的所有 `MelonEvents` 订阅 → 撤销该 owner 的 Harmony patch（即使前面步骤抛异常也会继续）→ 逐个 `Unregister(reason, important: true)`（触发 `OnDeinitializeMelon`）→ 重写兼容报告。
-- UMM 设置界面的 **Mods → Disable now** 就是调用该 API；**Skip next launch** 还会把 id 写入 `[lifecycle] disabledMods` 并保存 `Config.toml`。
-- 禁用只作用于当前会话，程序集仍留在进程里；重新加载需要重启游戏。
+- `AdapterRuntime.DisableMod(string modId, string reason)` 接受 mod id、显示名或程序集简单名（不区分大小写）；仅禁用 `Loaded` 模组，成功返回 `true`，否则返回 `false`。
+- 清理顺序：标记禁用 → 退订事件 → 撤销 Harmony patch → 调用 `Unregister`（触发 `OnDeinitializeMelon`）→ 更新兼容报告。某一步失败不会阻止后续清理。
+- 设置界面的 **Disable now** 调用此 API；**Skip next launch** 还会保存 id 到 `[lifecycle] disabledMods`。
+- 程序集仍驻留内存；重载需重启游戏。
 
 ## 8. 运行期注册与注销
 
-模组可以在回调里调用 `SomeMelon.Register()` / `Unregister(...)`（例如动态创建第二个 melon）：
+模组可在回调中调用 `Register()` / `Unregister()`：
 
-- `NotifyRegistered` 把 melon 关联到所属程序集的记录；未由适配器加载的程序集只会收到回调并记录警告，不进入兼容报告；
-- `NotifyUnregistered` 移除该 melon；当一条 `Loaded` 记录的 melon 全部注销时，记录转为 `Disabled`（原因 `All melons unregistered themselves.`）并停止回调。
+- `NotifyRegistered` 将 melon 关联到所属程序集；未由适配器加载的程序集只记录警告。
+- 当记录中的 melon 全部注销时，该记录转为 `Disabled` 并停止回调。
 
 ## 9. UMM 开关（`OnToggle`）
 
-关闭：
+关闭时保存偏好、清空协程、退订事件、撤销补丁并更新报告；后续帧和场景回调直接返回。
 
-1. 记录 `[lifecycle] MelonAdapter was disabled. Callbacks stop, preferences are saved and Harmony patches are removed. A game restart is required to load mods again.`
-2. `MelonPreferences.Save()`；
-3. 停止并清空所有协程；
-4. 逐模组退订 `MelonEvents` 订阅、撤销 Harmony patch；
-5. 重写兼容报告；此后 `Tick` / `FixedUpdate` / `LateUpdate` / `OnGUI` / 场景回调全部直接返回。
-
-再次开启：**不重新加载任何程序集**，只记录 `Re-enabling MelonAdapter is not possible at runtime: mod assemblies cannot be unloaded. Restart the game to load mods again.`。Mono 进程内没有安全的程序集卸载手段，适配器不假装已经恢复。
+再次开启不会重新加载模组；Mono 无法安全卸载程序集，需重启游戏。
 
 ## 10. 退出
 
-游戏退出或 UMM 卸载模组时（`OnUnload` → `Shutdown()`，幂等）：
+游戏退出或 UMM 卸载模组时，`OnUnload` 调用幂等的 `Shutdown()`：
 
 1. `[runtime] Shutting down; dispatching quit callbacks.`
 2. `MelonEvents.OnApplicationQuit` → 各 melon `OnApplicationQuit()`
@@ -149,9 +134,9 @@ Unity 5.x 之前没有 sceneUnloaded；Host 订阅失败时只记录 `[unity] Sc
 4. `MelonEvents.OnApplicationDefiniteQuit` → 各 melon `OnApplicationDefiniteQuit()`
 5. 逐 melon `Unregister("MelonAdapter shutdown", important: false)`，`OnDeinitializeMelon` 由 `Unregister` 触发；记录转为 `Disabled` 并标注 `Unregistered during shutdown.`
 6. 撤销所有 Harmony owner 的 patch、停止协程、卸下 resolver、写兼容报告
-7. `Shutdown complete: <状态摘要>`
+7. 记录关闭状态摘要。
 
-退出路径不创建新的 Unity 对象；`AdapterTicker` 先被停用再调用 `Shutdown()`。
+`AdapterTicker` 在调用 `Shutdown()` 前停用；退出路径不创建 Unity 对象。
 
 ## 11. 完整时序
 
@@ -182,4 +167,4 @@ UMM unload / game exit → Shutdown(): quit events, save, unregister, unpatch, r
 
 - 回调签名逐字对齐 0.7.3.0（含参数类型与可见性）；`OnGUI` 无参数、`OnFixedUpdate` 无参数、场景回调为 `(int buildIndex, string sceneName)`。
 - `OnApplicationDefiniteQuit` 只在真正退出时触发；适配器在 `Shutdown()` 中与 `OnApplicationQuit` 相邻触发，二者顺序固定。
-- 尚未在真实游戏中验证 Unity 版本区间，见 `spec/COMPATIBILITY.md`。
+- Unity 版本覆盖范围仍需验证，见 `spec/COMPATIBILITY.md`。

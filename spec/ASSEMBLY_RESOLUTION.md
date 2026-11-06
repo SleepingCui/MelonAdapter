@@ -1,6 +1,6 @@
 # 程序集解析（Assembly Resolution）
 
-模组 DLL 是在**运行时**读入的，它的基类、属性类型都来自 `MelonLoader.dll`。因此适配器必须在读取任何模组类型之前，就保证 `MelonLoader`（以及 `MelonAdapter.Runtime`、Harmony）能被解析，并且**不能**把游戏本体的程序集替换掉。
+模组 DLL 在运行时加载，基类和属性来自 `MelonLoader.dll`。适配器须在读取模组类型前解析自身依赖，并避免替换游戏程序集。
 
 ## 1. 三层解析
 
@@ -10,7 +10,7 @@
 | B. 模组扫描期解析 | `ModScanner` 读取每个 DLL 时，`ModAssemblyResolver.ProbingDirectory` 指向该文件所在目录 | 模组的私有依赖（同目录或子目录） |
 | C. 运行期解析 | 初始化时安装的 `AppDomain.AssemblyResolve` | 加载后才触发的依赖请求、依赖图登记的私有程序集 |
 
-A 层使用字节加载（`Assembly.Load(byte[])`），因此**位于网络驱动器上的游戏也能工作**（见第 6 节）。
+A 层使用字节加载（`Assembly.Load(byte[])`），因此支持网络位置上的游戏（见第 6 节）。
 
 ## 2. 探测顺序
 
@@ -28,9 +28,7 @@ A 层使用字节加载（`Assembly.Load(byte[])`），因此**位于网络驱�
 | 8 | `<Game>/<Product>_Data/Managed/` | Unity 标准构建的托管程序集目录 |
 | 9 | `<Game>/<Product>_Data/Managed/UnityModManager/` | UMM 自带的 Harmony 等程序集 |
 
-第 8、9 项由 `<Game>` 下所有 `*_Data` 目录枚举得到（例如 `A Dance of Fire and Ice_Data/Managed`）。1.2.1 之前只探测 `<Game>/Managed/`，而这个游戏用的是 `<Product>_Data/Managed`，因此模组通过反射加载类型时可能找不到 `UnityEngine.*`；游戏进程内这些程序集通常已加载，问题只在需要时才暴露。
-
-全部未命中则回落到 .NET 默认绑定（GAC 与游戏进程已加载的程序集）。
+第 8、9 项从 `<Game>` 下的 `*_Data` 目录枚举。未命中时回落到 .NET 默认绑定（GAC 和已加载程序集）。
 
 ## 3. 受保护程序集（绝不从模组目录解析）
 
@@ -39,18 +37,18 @@ mscorlib, System, netstandard, Mono.*, UnityEngine, Unity.*,
 Assembly-CSharp, UnityModManager, MelonLoader, MelonAdapter
 ```
 
-这条规则阻止模组用私有副本替换游戏核心程序集（例如自带一个 `Assembly-CSharp.dll`），从而避免类型身份分裂。受保护名称的请求一律交给游戏进程的默认解析。
+受保护名称始终交给游戏默认解析，防止模组私有副本替换核心程序集并造成类型身份冲突。
 
 ## 4. 版本与重复
 
-- 同一简单名只加载一次并缓存；后续请求返回缓存实例，不静默切换版本。
-- 同名但版本不同的私有程序集：记录 `[resolver]` 诊断，并把冲突写进兼容报告，由扫描器与依赖图决定该模组能否加载；适配器**不会**静默择一使用。
+- 同一简单名只加载一次并缓存，不会静默切换版本。
+- 同名异版本的私有程序集会记入诊断和兼容报告，由扫描器与依赖图判定是否拒绝；适配器不会静默择一。
 - 重复 mod id：按加载顺序排序后，后到者被拒绝（`Duplicate mod id ...: already provided by ...`）。
 - 适配器自身的程序集（`MelonLoader.dll`、`MelonAdapter.Runtime.dll`、`MelonAdapter.Harmony.dll`、`0Harmony.dll`）即使在 `Mods/` 下被发现也会被跳过，不会被当作模组。
 
 ## 5. 诊断
 
-`[resolver] diagnostics = true`（默认）时，每次解析都写入：
+默认开启 `[resolver] diagnostics`，记录每次解析：
 
 ```text
 [resolver] Requested <name>, Version=... by <requesting assembly>
@@ -58,11 +56,11 @@ Assembly-CSharp, UnityModManager, MelonLoader, MelonAdapter
 [resolver] Not found <name>; falling back to the default binding
 ```
 
-解析尝试汇总（最多 500 条）写入 `<adapter>/Logs/CompatibilityReport.txt` 的 `[Assembly resolution]` 段，包含请求方、目标、命中路径与决策。关闭该开关只保留失败记录，减少日志体积。
+报告最多保留 500 条，含请求方、程序集、命中路径和决策。关闭诊断后只记录失败请求。
 
 ## 6. 网络位置与 0x80131515
 
-在部分主机上（例如游戏装在 `D:` 等被 .NET Framework 判定为远程位置的卷），`Assembly.LoadFrom` / `LoadFile` 会抛 `FileLoadException`，内部原因是：
+在部分被 .NET Framework 视为网络位置的卷上，`Assembly.LoadFrom` / `LoadFile` 会抛 `FileLoadException`（HRESULT `0x80131515`）：
 
 ```text
 NotSupportedException: An attempt was made to load an assembly from a network location which
@@ -70,11 +68,11 @@ would have caused the assembly to be sandboxed in previous versions of the .NET 
 (HRESULT: 0x80131515)
 ```
 
-适配器的扫描与 A 层解析使用**字节加载**，不受该限制影响；只有当模组自己用 `Assembly.LoadFrom` 读取同目录文件时才可能遇到。该异常会被归类为 `FileLoadException` 并写入模组失败原因，而不是让整个启动失败。
+适配器扫描和 A 层解析使用字节加载，不受此限制影响。模组自行调用 `Assembly.LoadFrom` 时仍可能遇到；异常只记录为该模组的失败原因。
 
 ## 7. 加载错误分类
 
-`ModScanner` / `ModLoader` 把异常映射为可读原因，写进日志、`ModRecord.FailureReason` 与兼容报告：
+`ModScanner` / `ModLoader` 将下列错误写入日志、`ModRecord.FailureReason` 和兼容报告：
 
 | 分类 | 触发 | 记录示例 |
 |---|---|---|
@@ -88,15 +86,15 @@ would have caused the assembly to be sandboxed in previous versions of the .NET 
 | 游戏不匹配 | `MelonGameAttribute` 与当前游戏不符 | `The mod targets ..., but the running game is ...` |
 | Harmony 冲突 | 模组自带不同版本 `0Harmony.dll` | 见 `spec/COMPATIBILITY.md` 的 Harmony 一节 |
 
-每个模组的失败互不影响：单个程序集异常只让该记录进入 `Rejected` 或 `Failed`。
+单个模组失败不会阻止其它模组加载；该记录进入 `Rejected` 或 `Failed`。
 
 ## 8. 适配器自己的解析器（A 层）
 
-`AdapterInstall.InstallAssemblyResolver()` 幂等安装，只处理：
+`AdapterInstall.InstallAssemblyResolver()` 幂等安装，仅处理：
 
 - `MelonLoader`、`MelonAdapter.Runtime`、`0Harmony`（按简单名匹配）；
-- 探测目录：`MelonAdapter.dll` 所在目录，以及其下的 `Dependencies/`；
-- 使用 `Assembly.Load(File.ReadAllBytes(path))`，避免网络位置沙箱与文件锁定；
+- 探测 `MelonAdapter.dll` 所在目录及其 `Dependencies/`；
+- 使用 `Assembly.Load(File.ReadAllBytes(path))`，避开网络位置限制和文件锁定；
 - 失败时返回 `null`，让默认绑定继续尝试。
 
 `ModuleInitializer` 在 `net472` 上不内置，仓库内提供了一个内部 polyfill 特性（`System.Runtime.CompilerServices.ModuleInitializerAttribute`）。

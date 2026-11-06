@@ -1,6 +1,6 @@
 # 支持的 MelonLoader API（基线 0.7.3.0）
 
-本文档描述 MelonAdapter 1.2.2 对外暴露的 `MelonLoader.dll` facade 与真实 MelonLoader **0.7.3.0** 的对应关系。清单由对 facade 程序集的反射枚举 + 逐类型实现审查生成，与代码一致；任何一项改动都必须同步更新本文件与 `spec/COMPATIBILITY.md`。
+本文档列出 MelonAdapter 1.2.2 的 `MelonLoader.dll` facade 对 MelonLoader 0.7.3.0 的支持情况。API 变更时同步更新本文和 [`COMPATIBILITY.md`](COMPATIBILITY.md)。
 
 ## 1. 身份与绑定
 
@@ -12,9 +12,9 @@
 | 目标框架 | .NET Framework 4.7.2 |
 | UnityEngine 依赖 | **无** |
 
-因为 facade 与基线同名、同版本、同无强名身份，按 0.7.x 编译的模组在绑定时会解析到它。若模组编译时所依赖的成员在当前 facade 中不存在，会在加载阶段抛出 `TypeLoadException` / `MissingMethodException` / `MissingFieldException`，由运行时归类为"缺少 API"并拒绝该模组（见 `docs/VALIDATION.md` 的错误分类）。
+0.7.x 模组按程序集身份绑定到该 facade。缺少成员时会抛出 `TypeLoadException`、`MissingMethodException` 或 `MissingFieldException`，模组会因 API 缺失被拒绝（见 [`docs/VALIDATION.md`](../docs/VALIDATION.md)）。
 
-状态图例：**支持** = 行为与基线一致；**差异** = 可调用但语义/来源与官方不同（下文逐条列明）；**未实现** = 调用会被明确拒绝并输出诊断，不返回伪成功结果。
+标记含义：**支持**表示行为与基线一致；**差异**表示可调用但语义不同；**未实现**表示记录诊断并拒绝调用。
 
 ## 2. 元数据属性（全部支持）
 
@@ -38,7 +38,7 @@
 | `HarmonyDontPatchAllAttribute` | — | 设置 `MelonBase.HarmonyDontPatchAll`；运行时不自动 `PatchAll` |
 | `MelonPreferences_DontSaveAttribute` | — | 反射式偏好设置时跳过该字段/属性 |
 
-`MelonModInfoAttribute` / `MelonModGameAttribute` 作为已弃用的别名保留（与 0.7.x 一致）。
+保留已弃用别名 `MelonModInfoAttribute` / `MelonModGameAttribute`。
 
 ## 3. 核心类型
 
@@ -50,37 +50,36 @@
 - 生命周期虚方法：`OnEarlyInitializeMelon`、`OnInitializeMelon`、`OnLateInitializeMelon`、`OnApplicationEarlyStart`、`OnApplicationStart`、`OnApplicationLateStart`、`OnApplicationQuit`、`OnApplicationDefiniteQuit`、`OnUpdate`、`OnFixedUpdate`、`OnLateUpdate`、`OnGUI`、`OnDeinitializeMelon`、`OnModSettingsApplied`、`OnPreferencesLoaded`（无参/`string`）、`OnPreferencesSaved`（无参/`string`）、`OnPreSupportModule`。
 - 嵌套枚举：`MelonBase.Incompatibility`（`MLVersion`/`MLBuild`/`Game`/`GameVersion`/`ProcessName`/`Domain`/`Platform`）。
 
-差异：`HarmonyInstance` 返回 `HarmonyLib.Harmony`，由运行时为每个 melon 提供稳定 owner 的单一 Harmony 实例；若没有可用 Harmony 提供方，则记录错误并返回 `null`（见 §11）。`Register()` 在缺少 `MelonInfo` 或 `MelonAssembly` 时返回 `false` 并记录原因。
+差异：`HarmonyInstance` 使用共享 provider 为每个 melon 创建稳定 owner；provider 不可用时记录错误并返回 `null`。`Register()` 缺少 `MelonInfo` 或 `MelonAssembly` 时返回 `false` 并记录原因。
 
 ### 3.2 `MelonMod` / `Melon<T>` / `MelonTypeBase<T>`
 
-`MelonMod : MelonTypeBase<MelonMod>` 增加场景回调：`OnLevelWasInitialized(int)`、`OnLevelWasLoaded(int)`、`OnSceneWasInitialized(int, string)`、`OnSceneWasLoaded(int, string)`、`OnSceneWasUnloaded(int, string)`，以及便捷属性 `InfoAttribute`、`GameAttributes`。
+`MelonMod : MelonTypeBase<MelonMod>` 提供场景回调 `OnLevelWasInitialized(int)`、`OnLevelWasLoaded(int)`、`OnSceneWasInitialized(int, string)`、`OnSceneWasLoaded(int, string)`、`OnSceneWasUnloaded(int, string)`，以及 `InfoAttribute`、`GameAttributes`。
 
-`MelonTypeBase<T>` 提供 `static T Instance` 与 `static MelonLogger.Instance Logger`；`Melon<T>` 提供 `Instance` 与 `Logger`。实例在注册时赋值。
+`MelonTypeBase<T>` 和 `Melon<T>` 提供 `Instance` 与 `Logger`；注册时赋值。
 
 ### 3.3 `MelonAssembly`
 
 支持：`LoadedAssemblies`、`RegisteredMelons`、`Assembly`、`Location`、`Hash`、`LoadedMelons`、`RottenMelons`、`FindMelonInstance<T>()`、`GetMelonAssemblyOfMember(MemberInfo, object)`。
 
-**未实现**：`LoadMelonAssembly(string, bool)`、`LoadRawMelonAssembly(string, byte[])`。调用会写入错误日志（内容形如“loading assemblies at runtime is not supported by MelonAdapter v1 … restart the game”）并返回 `null`。
+**未实现**：`LoadMelonAssembly(string, bool)`、`LoadRawMelonAssembly(string, byte[])`。调用会记录错误并返回 `null`；需重启游戏加载程序集。
 
 ### 3.4 `MelonHandler` / `Main`
 
 支持：`MelonHandler.Mods`、`Plugins`、`Assemblies`、`IsModAlreadyLoaded(string)`、`GetMelonHash(string)`；`Main.GetUnityVersion()`、`Main.GetUserPath()`、`Main.Mods`。
 
-**未实现**：`MelonHandler.LoadFromFile(string, bool)`、`LoadFromAssembly(Assembly)`、`LoadFromByteArray(byte[], string)` —— 记录同样的“不支持运行期加载”错误并返回空数组。
+**未实现**：`MelonHandler.LoadFromFile(string, bool)`、`LoadFromAssembly(Assembly)`、`LoadFromByteArray(byte[], string)`。调用会记录错误并返回空数组。
 
 ## 4. 日志
 
 `MelonLogger`（静态）与 `MelonLogger.Instance` 支持：`Msg` / `Log` / `MsgPastel` / `MsgDirect` / `MsgPastelDirect` / `Warning` / `LogWarning` / `Error` / `LogError` / `BigError` / `WriteLine` / `WriteSpacer`，含 `ConsoleColor` 与 `Logging.ColorARGB` 重载和 `params object[]` 格式化。
 
-- 输出统一进入适配器日志（`<adapter>/Logs/MelonAdapter.log`）并镜像到 UMM 日志；来源前缀为 melon 名称。
-- `BigError` 映射为 `Critical` 级别。
-- `MelonDebug.IsEnabled()` 读取 `debugLogging`；`MelonDebug.Msg` 仅在开启时输出，并带 `[DEBUG]` 前缀。
-- `Logging.ColorARGB` 支持 `FromArgb` 各重载与常用命名色；颜色仅作为数据保存，**不产生 ANSI 颜色**。
+- 输出写入 `<adapter>/Logs/MelonAdapter.log` 并镜像到 UMM 日志，前缀为 melon 名称。
+- `BigError` 映射为 `Critical`；`MelonDebug` 使用 `debugLogging`，输出带 `[DEBUG]` 前缀。
+- `Logging.ColorARGB` 支持 `FromArgb` 重载和常用命名色；颜色不渲染为 ANSI 序列。
 - `MelonModLogger` 作为兼容空壳保留。
-- 回调事件与基线同名同形：`MsgCallbackHandler`（`Action<ConsoleColor, ConsoleColor, string, string>`）、`MsgDrawingCallbackHandler`（`Action<ColorARGB, ColorARGB, string, string>`）、`WarningCallbackHandler` / `ErrorCallbackHandler`（`Action<string, string>`），参数为 `(来源, 文本)`；回调抛异常只记录一条警告，不递归、不影响日志输出。
-- `MelonLoader.Pastel.ConsoleExtensions`（`Enable` / `Disable` / `Pastel` / `PastelBg`）与 `MelonLoader.Properties.BuildInfo`（`Version` = `0.7.3`、`VersionNumber`）提供；适配器日志不输出 ANSI 颜色，`Pastel` 在 `Enable()` 之前原样返回文本。
+- 回调事件：`MsgCallbackHandler`（`Action<ConsoleColor, ConsoleColor, string, string>`）、`MsgDrawingCallbackHandler`（`Action<ColorARGB, ColorARGB, string, string>`）、`WarningCallbackHandler` / `ErrorCallbackHandler`（`Action<string, string>`）。回调异常只记录警告，不影响日志输出。
+- 提供 `MelonLoader.Pastel.ConsoleExtensions` 和 `MelonLoader.Properties.BuildInfo`；未启用 Pastel 时文本原样返回。
 
 ## 5. 偏好设置
 
@@ -88,7 +87,7 @@
 
 `MelonPreferences_Category`：`Identifier`、`DisplayName`、`IsHidden`、`IsInlined`、`Entries`、`CreateEntry<T>`（4 参返回基类、7 参、8 参含 `oldIdentifier`）、`GetEntry`、`HasEntry`、`DeleteEntry`、`RenameEntry`、`LoadFromFile`、`SaveToFile`、`SetFilePath`（3 个重载）、`ResetFilePath`、`DestroyFileWatcher`。
 
-`oldIdentifier` 的语义：新建条目时若旧名字存在于内存中则改名保留值；若旧名字只存在于已保存文件里（上一次启动保存的），适配器读取旧值写入新条目，改名不会把设置重置为默认值。
+`oldIdentifier` 可从内存或偏好文件中迁移旧条目的值，避免重命名后恢复默认值。
 
 `MelonPreferences_Entry` / `MelonPreferences_Entry<T>`：`Identifier`、`DisplayName`、`Description`、`Comment`、`IsHidden`、`DontSaveDefault`、`Category`、`BoxedValue` / `BoxedEditedValue`、`Value` / `EditedValue` / `DefaultValue`、`Validator`、`OnEntryValueChanged`、`OnEntryValueChangedUntyped`、`ResetToDefault` 等。
 
@@ -102,11 +101,11 @@
 
 `MelonEventBase<T>` 提供 `Subscribe(delegate, int priority = 0, bool unsubscribeOnFirstInvocation = false)`、`Unsubscribe(delegate)`、`Unsubscribe(MethodInfo, object)`、`UnsubscribeAll()`、`CheckIfSubscribed`、`GetSubscribers`、`Invoke`、`Dispose`、`oneTimeUse`，嵌套订阅者类型为 `MelonEventBase<T>.MelonEventSubscriber`（公开字段 `del` / `priority` / `unsubscribeOnFirstInvocation` / `melonAssembly`）。委托类型 `LemonAction`、`LemonAction<T1..T8>`、`LemonFunc<TResult>`、`LemonFunc<T1..T8, TResult>` 同基线；`MelonEvent`、`MelonEvent<T1..T8>` 也按基线提供。
 
-运行时保证：事件先于对应 melon 回调触发；订阅者抛异常时记录 `Exception while invoking event subscriber` 并移除该订阅，不影响其他订阅者与后续派发。模组被禁用、异常停用或退出时，运行时按程序集批量退订（`EventSubscriptionTracker`）。
+事件先于对应模组回调触发。订阅者异常会被记录并移除，不影响其它订阅者；模组禁用或退出时按程序集退订。
 
 ## 7. 协程
 
-`MelonCoroutines.Start(IEnumerator)` / `Stop(object)` 由运行时的 `CoroutinePump` 在主线程每帧推进，支持嵌套 `IEnumerator`；Unity 的 `yield return null` / `WaitForSeconds` 等由 Host 安装的翻译器判定完成时机，无法识别时按一帧等待。协程抛异常会被记录并停止该协程。
+`MelonCoroutines.Start(IEnumerator)` / `Stop(object)` 由主线程上的 `CoroutinePump` 推进，支持嵌套迭代器。Host 翻译 Unity 的等待对象；无法识别时等待一帧。异常会记录并停止协程。
 
 ## 8. 工具与环境
 
@@ -122,7 +121,7 @@
 
 `ModPrefs`：`GetPrefs()`（返回 `Dictionary<string, Dictionary<string, ModPrefs.PrefDesc>>`）、`RegisterPrefBool` / `RegisterPrefFloat` / `RegisterPrefInt` / `RegisterPrefString`、`GetBool` / `GetFloat` / `GetInt` / `GetString`；嵌套 `PrefDesc : MelonPrefs.MelonPreference` 与枚举 `PrefType`。
 
-旧版调用被映射到 `MelonPreferences` 的条目上；未注册的键会记录警告并返回默认值。
+旧版 API 映射到 `MelonPreferences`；未注册键会警告并返回默认值。
 
 ## 10. 明确未实现
 
@@ -137,18 +136,17 @@
 
 ## 11. 与官方实现的行为差异
 
-1. **颜色不渲染**：Unity 控制台与日志文件都没有 ANSI 颜色，`ConsoleColor` / `ColorARGB` 只作为 API 形状保留。
-2. **颜色默认值**：`MelonLogger.DefaultMelonColor` / `DefaultTextColor` 为适配器常量，不读取 MelonLoader 主题配置。
-3. **运行期程序集加载被拒绝**（见 §10），因为程序集无法卸载、也无法在 UMM 单宿主下安全重入。
-4. **Harmony 单一提供方**：不是 MelonLoader 自带的那份；版本由 `Dependencies/0Harmony.dll` 决定并写入启动横幅与兼容报告。
-5. **偏好设置文件位置**：适配器 `UserData/`，形如 TOML；与官方格式字段一致但由适配器序列化（未知 section 会原样保留）。
-6. **`MelonUtils.IsGameIl2Cpp()` 恒为 false**，`CurrentDomain` 恒为 `MONO`：适配器不运行在 IL2CPP 下。
-7. **`MelonBase.Register()` 的失败路径**：缺元数据时返回 `false` 并记录原因，而不是抛出异常。
+1. **颜色**：颜色参数只保留 API 形状，不渲染；默认色为适配器常量。
+2. **动态加载**：运行期程序集加载不支持（见 §10）。
+3. **Harmony**：使用 `Dependencies/0Harmony.dll`，版本写入启动横幅和兼容报告。
+4. **偏好文件**：存放于适配器 `UserData/`，使用 TOML；未知 section 会保留。
+5. **运行时标记**：`IsGameIl2Cpp()` 恒为 `false`，`CurrentDomain` 恒为 `MONO`。
+6. **注册失败**：缺少元数据时 `MelonBase.Register()` 返回 `false` 并记录原因。
 
 ## 12. 适配器内部接口（非 MelonLoader API）
 
-`MelonAdapter` 在 `MelonLoader.dll` 中额外暴露一组用于进程内接线的类型，模组不应使用：
+`MelonLoader.dll` 还暴露以下内部接线类型；模组不应依赖它们：
 
 `AdapterBridge`（静态接线点：`LogSink`、`Context`、`PreferencesStorage`、`CoroutineRunner`、`HarmonyProvider`、`Registry`、`DescribeMissingService`）、`AdapterLogLevel`、`IAdapterLogSink`、`IAdapterContext`、`IAdapterPreferencesStorage`、`IAdapterCoroutineRunner`、`IAdapterHarmonyProvider`、`IAdapterMelonRegistry`。
 
-它们随 facade 一起分发是为了避免 facade → runtime 的反向依赖；在真实 MelonLoader 中不存在这些类型，依赖它们的模组不具备可移植性。
+这些类型用于避免 facade 对 runtime 的反向依赖，在真实 MelonLoader 中不存在。
