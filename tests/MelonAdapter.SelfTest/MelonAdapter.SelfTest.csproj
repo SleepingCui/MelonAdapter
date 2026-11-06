@@ -9,14 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The runtime links against 0Harmony and Newtonsoft.Json with Private=false; in the game both come
-         from the process (0Harmony from Dependencies/, Newtonsoft.Json from <Game>_Data/Managed), so the self
-         test mirrors that layout by placing them in its own output directory. -->
+    <!-- The game supplies 0Harmony, so the self test stages it beside its executable. -->
     <None Include="$(LibsDir)0Harmony.dll" Link="0Harmony.dll" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(LibsDir)Newtonsoft.Json.dll" Link="Newtonsoft.Json.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Use the signed NuGet build in tests; the game copy in libs/ has an invalid strong-name signature. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <ProjectReference Include="..\..\src\MelonAdapter.Runtime\MelonAdapter.Runtime.csproj" />
     <!-- Built before the self test so the sample assemblies are available, but never referenced. -->
     <ProjectReference Include="..\..\samples\SampleMod\SampleMod.csproj" ReferenceOutputAssembly="false" />
