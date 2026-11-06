@@ -1,5 +1,9 @@
 # MelonAdapter
 
+> [!WARNING]
+> **MelonAdapter is under active development.**
+> This project is still evolving and has not yet been proven stable across all supported game environments. You may encounter bugs, compatibility issues, or unexpected behavior. Features and APIs may change between versions. Use it with this in mind, and report any issues you encounter.
+
 MelonAdapter 让 UnityModManager（UMM）加载使用 MelonLoader 0.7.3.0 API 编写的 `MelonMod`。目前只支持 Unity Mono 游戏。
 
 | 项目 | 信息 |
@@ -18,6 +22,10 @@ MelonAdapter 让 UnityModManager（UMM）加载使用 MelonLoader 0.7.3.0 API �
 - `MelonAdapter.SelfTest`：74 项检查通过。
 - 已在 *A Dance of Fire and Ice* + UMM 上验证 TimingShow 1.9.3；Jipper Key Viewer 1.7.1 的 API 签名问题已在 1.2.2 修复。
 - 其余待验证场景见 [`spec/COMPATIBILITY.md`](spec/COMPATIBILITY.md) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+
+> [!IMPORTANT]
+> **Passing self-tests does not guarantee compatibility with every game or mod.**
+> The current validation covers automated tests and a limited number of real-world setups. Other Unity versions, game configurations, and mod combinations still require verification. See the [validation matrix](docs/VALIDATION.md) for details.
 
 ## 架构
 
@@ -55,12 +63,16 @@ Host 在读取模组类型前安装 `AssemblyResolve`，确保能解析 `MelonLo
 
 ```powershell
 dotnet build MelonAdapter.slnx -m:1 -nodeReuse:false
-.\tests\MelonAdapter.SelfTest\bin\Debug\net472\MelonAdapter.SelfTest.exe
+.\\tests\\MelonAdapter.SelfTest\\bin\\Debug\\net472\\MelonAdapter.SelfTest.exe
 ```
 
 使用 `-m:1` 可避免部分沙箱和 CI 环境中的 MSBuild 多节点管道故障；`build.ps1` 已包含此参数。构建需要 `libs/` 中的 UMM、Unity、Harmony 和 Newtonsoft.Json 程序集；`libs/` 不入库，运行时引用不随发布包分发。
 
 ## 安装
+
+> [!CAUTION]
+> **Do not install MelonAdapter alongside a real MelonLoader installation.**
+> They use conflicting `MelonLoader` assembly identities and are not designed to coexist. MelonAdapter detects common conflict conditions and will refuse to load mods when they are found. Remove the conflicting MelonLoader installation before using MelonAdapter.
 
 1. 将发布包放入 `<Game>/Mods/MelonAdapter/`。
 2. 首次启动后，适配器会在数据目录创建配置、日志、模组和用户数据目录。默认数据目录是 `<Game>/Mods/MelonAdapter/`；已有 `<Game>/MelonAdapter/` 安装时会继续使用该目录。
@@ -81,7 +93,10 @@ dotnet build MelonAdapter.slnx -m:1 -nodeReuse:false
 | 偏好设置 | `<适配器目录>/UserData/MelonPreferences.cfg` |
 | 界面语言 | `<适配器目录>/lang.json`；缺失或损坏时使用内嵌副本 |
 
-点击 UMM 中的 MelonAdapter 条目可打开设置界面，查看模组状态和日志、编辑偏好、调整配置或切换中英文。完整选项见 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)。关闭适配器会停止回调并清理订阅和补丁；重新启用需重启游戏。
+点击 UMM 中的 MelonAdapter 条目可打开设置界面，查看模组状态和日志、编辑偏好、调整配置或切换中英文。完整选项见 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)。
+
+> [!NOTE]
+> Disabling MelonAdapter stops callbacks and cleans up subscriptions and patches, but Mono assemblies remain loaded in memory. **A game restart is required before enabling it again.**
 
 ## 文档
 
