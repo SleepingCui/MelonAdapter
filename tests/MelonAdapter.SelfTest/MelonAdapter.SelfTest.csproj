@@ -9,9 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- The runtime links against 0Harmony with Private=false; the shipped layout keeps it next to the
-         adapter assemblies, so the self test mirrors that by placing it in its own output directory. -->
+    <!-- The runtime links against 0Harmony and Newtonsoft.Json with Private=false; in the game both come
+         from the process (0Harmony from Dependencies/, Newtonsoft.Json from <Game>_Data/Managed), so the self
+         test mirrors that layout by placing them in its own output directory. -->
     <None Include="$(LibsDir)0Harmony.dll" Link="0Harmony.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(LibsDir)Newtonsoft.Json.dll" Link="Newtonsoft.Json.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

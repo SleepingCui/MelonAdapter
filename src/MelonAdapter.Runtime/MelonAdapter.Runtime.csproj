@@ -19,5 +19,13 @@
       <HintPath>$(LibsDir)0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!--
+      The game already ships Newtonsoft.Json 13.0.0.0 in <Game>_Data/Managed (libs/ holds the same file), so
+      the language catalog binds to the copy that is already loaded instead of carrying its own JSON reader.
+    -->
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(LibsDir)Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 </Project>

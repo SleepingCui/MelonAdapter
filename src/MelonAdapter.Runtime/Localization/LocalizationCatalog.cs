@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace MelonAdapter.Runtime.Localization
 {
@@ -307,45 +309,41 @@ namespace MelonAdapter.Runtime.Localization
         private bool Merge(string json, string path, out string error)
         {
             error = null;
-            Dictionary<string, object> root;
+            JObject root;
             try
             {
-                root = JsonLite.ParseObject(json);
+                root = ParseDocument(json);
             }
-            catch (FormatException exception)
+            catch (JsonException exception)
             {
                 error = exception.Message;
                 return false;
             }
 
             List<string> declaredOrder = new List<string>();
-            object declared;
-            if (root.TryGetValue("languages", out declared))
+            JArray declared = root["languages"] as JArray;
+            if (declared != null)
             {
-                List<object> list = declared as List<object>;
-                if (list != null)
+                foreach (JToken item in declared)
                 {
-                    foreach (object item in list)
+                    string language = item.Type == JTokenType.String ? (string)item : null;
+                    if (!string.IsNullOrEmpty(language))
                     {
-                        string language = item as string;
-                        if (!string.IsNullOrEmpty(language))
-                        {
-                            declaredOrder.Add(Normalise(language));
-                        }
+                        declaredOrder.Add(Normalise(language));
                     }
                 }
             }
 
             int merged = 0;
-            foreach (KeyValuePair<string, object> pair in root)
+            foreach (JProperty pair in root.Properties())
             {
-                Dictionary<string, object> table = pair.Value as Dictionary<string, object>;
+                JObject table = pair.Value as JObject;
                 if (table == null)
                 {
                     continue;
                 }
 
-                string language = Normalise(pair.Key);
+                string language = Normalise(pair.Name);
                 if (language.Length == 0)
                 {
                     continue;
@@ -358,15 +356,15 @@ namespace MelonAdapter.Runtime.Localization
                     _tables[language] = strings;
                 }
 
-                foreach (KeyValuePair<string, object> entry in table)
+                foreach (JProperty entry in table.Properties())
                 {
-                    string value = entry.Value as string;
+                    string value = entry.Value.Type == JTokenType.String ? (string)entry.Value : null;
                     if (value == null)
                     {
                         continue;
                     }
 
-                    strings[entry.Key] = value;
+                    strings[entry.Name] = value;
                     merged++;
                 }
 
@@ -384,6 +382,25 @@ namespace MelonAdapter.Runtime.Localization
 
             ReorderLanguages(declaredOrder);
             return true;
+        }
+
+        /// <summary>
+        /// Reads one catalog document. Newtonsoft.Json is already loaded by the game, so the adapter reads
+        /// JSON with the same serializer the rest of the process uses instead of keeping its own reader.
+        /// </summary>
+        private static JObject ParseDocument(string json)
+        {
+            if (json == null)
+            {
+                throw new JsonException("The language catalog is empty.");
+            }
+
+            if (json.Length > 0 && json[0] == '\uFEFF')
+            {
+                json = json.Substring(1);
+            }
+
+            return JObject.Parse(json);
         }
 
         private void ReorderLanguages(List<string> declaredOrder)
