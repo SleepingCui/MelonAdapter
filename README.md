@@ -8,7 +8,7 @@ MelonAdapter 让 UnityModManager（UMM）加载使用 MelonLoader 0.7.3.0 API �
 | 项目 | 信息 |
 |---|---|
 | 适配器版本 | 1.2.2 |
-| API 基线 | MelonLoader 0.7.3.0（同名、同版本、无强名 facade） |
+| API 基线 | MelonLoader 0.7.3.0 |
 | 运行时 | Unity Mono / .NET Framework 4.7.2 |
 | 宿主 | UnityModManager 0.32.x |
 | Harmony | Harmony 2.x，由 `Dependencies/0Harmony.dll` 提供 |
