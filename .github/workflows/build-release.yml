@@ -1,0 +1,122 @@
+name: Build Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (for example, 1.2.2 or v1.2.2)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout MelonAdapter
+        uses: actions/checkout@v7
+
+      - name: Checkout ADOFAI libraries
+        uses: actions/checkout@v7
+        with:
+          repository: SleepingCui/adofai-libs
+          ref: main
+          token: ${{ secrets.ADOFAI_LIBS_TOKEN }}
+          path: libs
+
+      - name: Verify build dependencies
+        shell: pwsh
+        run: |
+          $required = @(
+            'UnityEngine.dll',
+            'UnityEngine.CoreModule.dll',
+            'UnityEngine.IMGUIModule.dll',
+            'UnityEngine.TextRenderingModule.dll',
+            'UnityModManager.dll',
+            '0Harmony.dll',
+            'Newtonsoft.Json.dll'
+          )
+
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path 'libs' $_)) }
+          if ($missing) {
+            Write-Error "Missing build dependencies in libs/: $($missing -join ', ')"
+            exit 1
+          }
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Set package version
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        shell: pwsh
+        run: |
+          $tag = $env:RELEASE_TAG.Trim()
+          if ($tag -notmatch '^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "Invalid release tag '$tag'. Use a semantic version such as 1.2.2 or v1.2.2."
+          }
+
+          $packageVersion = $tag -replace '^v', ''
+          $infoPath = 'packaging/UMM/MelonAdapter/Info.json'
+          $info = Get-Content -LiteralPath $infoPath -Raw | ConvertFrom-Json
+          $info.Version = $packageVersion
+          $info | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $infoPath -Encoding utf8
+
+      - name: Build, self-test, and package
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: Verify package
+        shell: pwsh
+        run: |
+          $package = 'dist/MelonAdapter.zip'
+          if (-not (Test-Path -LiteralPath $package)) {
+            throw "$package was not generated."
+          }
+
+          Get-Item -LiteralPath $package | Format-List Name, Length, FullName
+          Get-FileHash -LiteralPath $package -Algorithm SHA256
+
+      - name: Prepare release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $changelog = 'CHANGELOG.md'
+          if (-not (Test-Path -LiteralPath $changelog)) {
+            throw 'CHANGELOG.md was not found.'
+          }
+
+          $body = Get-Content -LiteralPath $changelog -Raw
+          $delimiter = "CHANGELOG_$([guid]::NewGuid().ToString('N'))"
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "body<<$delimiter"
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value $body -NoNewline
+          Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "`n$delimiter"
+
+      - name: Create and push tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        shell: pwsh
+        run: |
+          git tag "$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create the release tag.' }
+
+          git push origin "$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not push the release tag.' }
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_BODY: ${{ steps.notes.outputs.body }}
+        shell: pwsh
+        run: |
+          gh release create "$env:RELEASE_TAG" `
+            'dist/MelonAdapter.zip' `
+            --draft `
+            --title "$env:RELEASE_TAG" `
+            --notes "$env:RELEASE_BODY"
