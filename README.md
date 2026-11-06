@@ -1,9 +1,9 @@
 # MelonAdapter
 
 > [!WARNING]
-> **本 Mod 仍在开发中，尚未完全稳定。** 使用过程中可能遇到 Bug、兼容性问题或其他异常，请谨慎使用。
+> 本 Mod 使用过程中可能遇到 Bug、兼容性问题或其他异常，请谨慎使用。
 
-MelonAdapter 让 UnityModManager（UMM）加载使用 MelonLoader 0.7.3.0 API 编写的 `MelonMod`。目前只支持 Unity Mono 游戏。
+MelonAdapter 让 UnityModManager（UMM）加载使用 MelonLoader 0.7.3.0 API 编写的 `MelonMod`。
 
 | 项目 | 信息 |
 |---|---|
@@ -14,16 +14,11 @@ MelonAdapter 让 UnityModManager（UMM）加载使用 MelonLoader 0.7.3.0 API �
 | Harmony | Harmony 2.x，由 `Dependencies/0Harmony.dll` 提供 |
 
 > [!IMPORTANT]
-> **MelonAdapter 不支持 IL2CPP 游戏，仅适用于 Unity Mono 游戏。**
+> **不支持 IL2CPP 游戏，仅适用于 Unity Mono 游戏。**
+> 
+> **不支持 MelonPlugin、与真实 MelonLoader 共存或运行期卸载程序集。**
 
-不支持 `MelonPlugin`、与真实 MelonLoader 共存或运行期卸载程序集。
 
-## 状态
-
-- 构建：0 警告、0 错误。
-- `MelonAdapter.SelfTest`：74 项检查通过。
-- 已在 *A Dance of Fire and Ice* + UMM 上验证 TimingShow 1.9.3；Jipper Key Viewer 1.7.1 的 API 签名问题已在 1.2.2 修复。
-- 其余待验证场景见 [`spec/COMPATIBILITY.md`](spec/COMPATIBILITY.md) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
 ## 架构
 
