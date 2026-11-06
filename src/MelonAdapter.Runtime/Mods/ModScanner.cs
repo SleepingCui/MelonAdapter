@@ -40,7 +40,11 @@ namespace MelonAdapter.Runtime.Mods
                 return records;
             }
 
-            List<string> files = Directory.GetFiles(modsDirectory, "*.dll", SearchOption.AllDirectories)
+            // "*" plus a suffix test instead of "*.dll": the .NET Framework treats an extension of exactly
+            // three characters in a search pattern as a prefix, so "*.dll" also returns "Mod.dllx" and
+            // "Mod.dllbak", which only show up later as BadImageFormatException noise while scanning.
+            List<string> files = Directory.GetFiles(modsDirectory, "*", SearchOption.AllDirectories)
+                .Where(path => path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                 .Where(path => !IsAdapterAssembly(path))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToList();

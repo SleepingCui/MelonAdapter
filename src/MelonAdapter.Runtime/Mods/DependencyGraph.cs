@@ -76,12 +76,13 @@ namespace MelonAdapter.Runtime.Mods
 
             List<ModRecord> remaining = nodes.Where(record => record.State != ModState.Rejected).ToList();
             List<ModRecord> ready = remaining.Where(record => incoming[record] == 0).ToList();
+            HashSet<ModRecord> ordered = new HashSet<ModRecord>();
             while (ready.Count > 0)
             {
                 ready.Sort(Compare);
                 ModRecord next = ready[0];
                 ready.RemoveAt(0);
-                if (result.Order.Contains(next))
+                if (!ordered.Add(next))
                 {
                     continue;
                 }
@@ -89,7 +90,7 @@ namespace MelonAdapter.Runtime.Mods
                 result.Order.Add(next);
                 foreach (ModRecord dependent in edges[next])
                 {
-                    if (--incoming[dependent] <= 0 && !result.Order.Contains(dependent))
+                    if (--incoming[dependent] <= 0 && !ordered.Contains(dependent))
                     {
                         ready.Add(dependent);
                     }
@@ -98,7 +99,7 @@ namespace MelonAdapter.Runtime.Mods
 
             foreach (ModRecord record in remaining)
             {
-                if (result.Order.Contains(record))
+                if (ordered.Contains(record))
                 {
                     continue;
                 }

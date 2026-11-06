@@ -84,43 +84,6 @@ namespace MelonAdapter.Runtime.Toml
             return root;
         }
 
-        public static string Serialize(TomlTable table)
-        {
-            StringBuilder builder = new StringBuilder();
-            WriteTable(builder, table, null);
-            return builder.ToString();
-        }
-
-        private static void WriteTable(StringBuilder builder, TomlTable table, string prefix)
-        {
-            List<KeyValuePair<string, object>> scalars = new List<KeyValuePair<string, object>>();
-            List<KeyValuePair<string, object>> tables = new List<KeyValuePair<string, object>>();
-
-            foreach (KeyValuePair<string, object> pair in table)
-            {
-                if (pair.Value is TomlTable)
-                {
-                    tables.Add(pair);
-                }
-                else
-                {
-                    scalars.Add(pair);
-                }
-            }
-
-            foreach (KeyValuePair<string, object> pair in scalars)
-            {
-                builder.Append(EscapeKey(pair.Key)).Append(" = ").Append(FormatValue(pair.Value)).Append('\n');
-            }
-
-            foreach (KeyValuePair<string, object> pair in tables)
-            {
-                string header = string.IsNullOrEmpty(prefix) ? EscapeKey(pair.Key) : prefix + "." + EscapeKey(pair.Key);
-                builder.Append('\n').Append('[').Append(header).Append(']').Append('\n');
-                WriteTable(builder, (TomlTable)pair.Value, header);
-            }
-        }
-
         public static string FormatValue(object value)
         {
             if (value == null)
@@ -194,21 +157,6 @@ namespace MelonAdapter.Runtime.Toml
 
             builder.Append('"');
             return builder.ToString();
-        }
-
-        private static string EscapeKey(string key)
-        {
-            bool simple = key.Length > 0;
-            foreach (char c in key)
-            {
-                if (!char.IsLetterOrDigit(c) && c != '_' && c != '-')
-                {
-                    simple = false;
-                    break;
-                }
-            }
-
-            return simple ? key : Quote(key);
         }
 
         private static string StripComment(string line)
